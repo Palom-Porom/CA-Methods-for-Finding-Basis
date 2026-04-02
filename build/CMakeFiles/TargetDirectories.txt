@@ -1,4 +1,0 @@
-C:/Users/Riku/Projects/CA-Methods-for-Finding-Basis/build/CMakeFiles/gmres_test.dir
-C:/Users/Riku/Projects/CA-Methods-for-Finding-Basis/build/CMakeFiles/test.dir
-C:/Users/Riku/Projects/CA-Methods-for-Finding-Basis/build/CMakeFiles/edit_cache.dir
-C:/Users/Riku/Projects/CA-Methods-for-Finding-Basis/build/CMakeFiles/rebuild_cache.dir
