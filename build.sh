@@ -1,35 +1,72 @@
 #!/usr/bin/env bash
-# build.sh — configure, build, and run gmres_test
+# build.sh — configure, build, and run tests (CG or GMRES)
 #
 # Usage:
-#   ./build.sh              — STL backend (default)
-#   ./build.sh --blas       — BLAS backend
-#   ./build.sh --clean      — wipe build dir first
-#   ./build.sh --clean --blas
-#   ./build.sh --no-run     — build only, don't execute
+#   ./build.sh                          — STL backend, synthetic matrix (CG by default)
+#   ./build.sh --cg                     — Run CG (default)
+#   ./build.sh --gmres                  — Run GMRES
+#   ./build.sh --blas                   — BLAS backend
+#   ./build.sh --mm-file path/to/A.mtx  — load matrix from file
+#   ./build.sh --clean                  — wipe build dir first
+#   ./build.sh --no-run                 — build only, don't execute
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
-BUILD="$ROOT/build"
-SRC="$ROOT/src/gmres"
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+    EXE=".exe"
+else
+    EXE=""
+fi
 
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+
+# По умолчанию собираем и запускаем CG
+ALGO="cg"
 USE_BLAS=OFF
 CLEAN=0
 RUN=1
+MM_FILE=""   # empty = synthetic matrix
 
 for arg in "$@"; do
     case "$arg" in
-        --blas)   USE_BLAS=ON ;;
-        --clean)  CLEAN=1 ;;
-        --no-run) RUN=0 ;;
+        --cg)      ALGO="cg" ;;
+        --gmres)   ALGO="gmres" ;;
+        --blas)    USE_BLAS=ON ;;
+        --clean)   CLEAN=1 ;;
+        --no-run)  RUN=0 ;;
+        --mm-file) MM_FILE_NEXT=1 ;;   # next arg is the path
         -h|--help)
-            echo "Usage: $0 [--blas] [--clean] [--no-run]"
+            echo "Usage: $0 [--cg|--gmres] [--blas] [--clean] [--no-run] [--mm-file <path>]"
             exit 0 ;;
         *)
-            echo "Unknown option: $arg"; exit 1 ;;
+            # collect the value after --mm-file
+            if [[ "${MM_FILE_NEXT:-0}" -eq 1 ]]; then
+                MM_FILE="$arg"
+                MM_FILE_NEXT=0
+            else
+                echo "Unknown option: $arg"; exit 1
+            fi ;;
     esac
 done
+
+# Resolve MM_FILE to an absolute path so the binary can be run from anywhere
+if [[ -n "$MM_FILE" ]]; then
+    # realpath is available on Linux; on macOS use python fallback
+    if command -v realpath &>/dev/null; then
+        MM_FILE="$(realpath "$MM_FILE")"
+    else
+        MM_FILE="$(python3 -c "import os,sys; print(os.path.abspath(sys.argv[1]))" "$MM_FILE")"
+    fi
+
+    if [[ ! -f "$MM_FILE" ]]; then
+        echo "[ERROR] Matrix file not found: $MM_FILE"
+        exit 1
+    fi
+fi
+
+# Устанавливаем пути в зависимости от выбранного алгоритма
+SRC="$ROOT/src/$ALGO"
+BUILD="$ROOT/build/$ALGO" # Разделяем папки сборки: build/cg и build/gmres
 
 # ── Clean ────────────────────────────────────────────────────────────────────
 if [[ $CLEAN -eq 1 && -d "$BUILD" ]]; then
@@ -37,7 +74,7 @@ if [[ $CLEAN -eq 1 && -d "$BUILD" ]]; then
     rm -rf "$BUILD"
 fi
 
-# ── Configure (only when CMakeCache is absent or USE_BLAS changed) ───────────
+# ── Configure ────────────────────────────────────────────────────────────────
 CACHE="$BUILD/CMakeCache.txt"
 NEEDS_CONFIGURE=1
 
@@ -47,19 +84,25 @@ if [[ -f "$CACHE" ]]; then
 fi
 
 if [[ $NEEDS_CONFIGURE -eq 1 ]]; then
-    echo "» Configuring  (USE_BLAS=$USE_BLAS)"
+    echo "» Configuring $ALGO (USE_BLAS=$USE_BLAS)"
     cmake -S "$SRC" -B "$BUILD" -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
           -DUSE_BLAS="$USE_BLAS"
 fi
 
 # ── Build ────────────────────────────────────────────────────────────────────
-echo "» Building"
+echo "» Building $ALGO"
 cmake --build "$BUILD" --parallel
 
 # ── Run ──────────────────────────────────────────────────────────────────────
 if [[ $RUN -eq 1 ]]; then
-    echo "» Running gmres_test"
+    echo "» Running ${ALGO}_test"
     echo ""
-    "$BUILD/gmres_test.exe"
+
+    if [[ -n "$MM_FILE" ]]; then
+        echo "  Matrix file: $MM_FILE"
+        "$BUILD/${ALGO}_test$EXE" --mm-file "$MM_FILE"
+    else
+        "$BUILD/${ALGO}_test$EXE"
+    fi
 fi
