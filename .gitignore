@@ -1,6 +1,6 @@
 build/
 
-./claude
+.claude/
 
 ./octave/matrix2.mtx
 ./octave/matrix3.mtx
