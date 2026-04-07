@@ -2,7 +2,7 @@ function A = read_mtx(filename)
   printf("=== Benchmark for file: %s ===\n", filename);
 
   % ---------------------------
-  % 1. Замер времени твоей функции
+  % 1. Замер времени
   % ---------------------------
   tic;
   t1 = tic;
@@ -13,7 +13,7 @@ function A = read_mtx(filename)
   printf("Matrix size: %dx%d, nnz=%d\n", rows(A), columns(A), nnz(A));
 
   % ---------------------------
-  % 2. Попытка сравнения с mmread (если доступна)
+  % 2. Попытка сравнения с mmread
   % ---------------------------
   has_mmread = exist("mmread", "file");
 
@@ -54,9 +54,9 @@ function A = read_mtx(filename)
 endfunction
 
 
-% ============================
-% Твоя функция (чуть оптимизирована)
-% ============================
+  % ---------------------------
+  % Оптимизация
+  % ---------------------------
 function A = read_custom(filename)
   fid = fopen(filename, 'r');
 
